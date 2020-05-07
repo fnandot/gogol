@@ -1,4 +1,4 @@
-# GoGoL (Go Game of Life)
+# Go Game of Life (GoGoL)
 
 ## Conway's Game of Life
 
