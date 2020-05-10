@@ -1,4 +1,4 @@
-module github.com/letnando/game-of-life
+module github.com/letnando/gogol
 
 go 1.13
 
@@ -15,5 +15,6 @@ require (
 	github.com/motemen/gore v0.5.0 // indirect
 	github.com/oklog/ulid/v2 v2.0.2 // indirect
 	github.com/peterh/liner v1.2.0 // indirect
+	golang.org/x/image v0.0.0-20190321063152-3fc05d484e9f
 	golang.org/x/tools v0.0.0-20200501155019-2658dc0cadb5 // indirect
 )
