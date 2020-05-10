@@ -3,78 +3,75 @@ package gameoflife
 import (
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/imdraw"
-	"golang.org/x/image/colornames"
 	"image/color"
 	"math/rand"
 )
 
 type Cell struct {
-	alive bool
-	age   int
-	col   int
-	row   int
-	hex   Hexagon
+	Alive bool
+	Age   uint8
+	Vec   Vec
+	Pol   Polygon
 }
 
-type Hexagon [6]pixel.Vec
+type Vec struct {
+	X uint
+	Y uint
+}
 
-func NewCell(width float64, height float64, col int, row int) *Cell {
+func NewCell(width float64, X uint, Y uint) *Cell {
 
 	alive := false
 
-	if rand.Intn(100) > 70 {
+	if rand.Intn(100) > 90 {
 		alive = true
 	}
 
+	pol := NewHexagon(uint(width), X, Y)
+
 	return &Cell{
-		alive: alive,
-		hex:   NewHexagon(width, height, col, row),
-		age:   -1,
-		row:   row,
-		col:   col,
+		Alive: alive,
+		Pol:   pol[:],
+		Age:   0,
+		Vec: Vec{
+			Y: Y,
+			X: X,
+		},
 	}
 }
 
 func (c *Cell) Kill() {
-	c.alive = false
+	c.Alive = false
 }
 
 func (c *Cell) Revive() {
-	c.age = 0
-	c.alive = true
+	c.Age = 0
+	c.Alive = true
 }
 
 func (c *Cell) IsAlive() bool {
-	return c.alive
+	return c.Alive
 }
 
 func (c *Cell) Tick() {
 	if c.IsAlive() {
-		c.age++
-	} else if c.age > 0 {
-		c.age--
+		c.Age++
+	} else if c.Age > 0 {
+		c.Age--
 	}
 }
 
 func (c *Cell) Draw(t pixel.Target) {
 
-	if false == c.IsAlive() && c.age <= 0 {
+	if false == c.IsAlive() && c.Age <= 0 {
 		return
 	}
 
 	draw := imdraw.New(nil)
 
-	if c.age < 3 {
-		draw.Color = color.RGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}
-	} else if c.age < 5 {
-		draw.Color = colornames.Orange
-	} else if c.age < 7 {
-		draw.Color = colornames.Orangered
-	} else {
-		draw.Color = colornames.Red
-	}
+	draw.Color = color.RGBA{R: 0xff, G: 0xff - c.Age*10, B: 0xff - c.Age*20, A: 0xff}
 
-	draw.Push(c.hex[:]...)
+	draw.Push(c.Pol[:]...)
 
 	if c.IsAlive() {
 		draw.Polygon(0)
@@ -85,29 +82,10 @@ func (c *Cell) Draw(t pixel.Target) {
 	draw.Draw(t)
 }
 
-func (c *Cell) DrawSlot(t pixel.Target) {
+func (c *Cell) DrawEmpty(t pixel.Target) {
 	draw := imdraw.New(nil)
-	draw.Color = colornames.Gray
-	draw.Push(c.hex[:]...)
+	draw.Color = color.RGBA{R: 0x20, G: 0x20, B: 0x20, A: 0xff}
+	draw.Push(c.Pol[:]...)
 	draw.Polygon(1)
 	draw.Draw(t)
-}
-
-func NewHexagon(width float64, height float64, col int, row int) Hexagon {
-
-	x := float64(col)*(width*0.75) + width*0.5
-	y := float64(row)*height + height/2
-
-	if col%2 == 1 {
-		y += height / 2
-	}
-
-	return Hexagon{
-		pixel.V(x, y),
-		pixel.V(x+width*0.50, y),
-		pixel.V(x+width*0.75, y+height/2),
-		pixel.V(x+width*0.50, y+height),
-		pixel.V(x, y+height),
-		pixel.V(x-width*0.25, y+height/2),
-	}
 }
