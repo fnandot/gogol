@@ -15,6 +15,8 @@ require (
 	github.com/motemen/gore v0.5.0 // indirect
 	github.com/oklog/ulid/v2 v2.0.2 // indirect
 	github.com/peterh/liner v1.2.0 // indirect
-	golang.org/x/image v0.0.0-20190321063152-3fc05d484e9f
-	golang.org/x/tools v0.0.0-20200501155019-2658dc0cadb5 // indirect
+	golang.org/x/exp v0.0.0-20200513190911-00229845015e // indirect
+	golang.org/x/image v0.0.0-20190802002840-cff245a6509b
+	golang.org/x/tools v0.0.0-20200515220128-d3bf790afa53
+	gonum.org/v1/gonum v0.7.0 // indirect
 )

@@ -1,149 +1,105 @@
 package main
 
 import (
-	"bytes"
+	"flag"
 	"fmt"
 	"github.com/faiface/pixel"
-	"github.com/faiface/pixel/imdraw"
 	"github.com/faiface/pixel/pixelgl"
-	"github.com/letnando/gogol/internal"
+	gogol "github.com/letnando/gogol/internal"
 	"golang.org/x/image/colornames"
-	"io/ioutil"
 	"log"
 	"math/rand"
-	"compress/gzip"
+	"strconv"
+	"strings"
 	"time"
-)
-
-const (
-	windowWidth  = 1024
-	windowHeight = 768
 )
 
 func main() {
 	log.Print("Started game")
-	pixelgl.Run(run)
+
+	res := flag.String("resolution", "1600x900", "resolution of the window in pixels [default=1600x900]")
+	cs := flag.Float64("cellsize", float64(10), "cell size in pixels [default=10]")
+	mr := flag.Float64("margin", float64(10), "margin of the grid in pixels [default=10]")
+	fs := flag.Bool("fullscreen", false, "show on fullscreen")
+	vs := flag.Bool("vsync", false, "activate vsync")
+	debug := flag.Bool("debug", false, "debug mode")
+	flag.Parse()
+
+	spl := strings.Split(*res, "x")
+
+	windowWidth, _ := strconv.ParseFloat(spl[0], 64)
+	windowHeight, _ := strconv.ParseFloat(spl[1], 64)
+
+	pixelgl.Run(func() {
+		run(*fs, *debug, *vs, *cs, *mr, windowWidth, windowHeight)
+	})
 }
 
-func run() {
+func run(fullscreen, debug, vsync bool, cellSize, margin, windowWidth, windowHeight float64) {
+
 	cfg := pixelgl.WindowConfig{
 		Title:  "Game of Life",
 		Bounds: pixel.R(0, 0, windowWidth, windowHeight),
-		VSync:  true,
+		VSync:  vsync,
 	}
+
+	if true == fullscreen {
+		cfg.Monitor = pixelgl.PrimaryMonitor()
+	}
+
 	win, err := pixelgl.NewWindow(cfg)
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	grid := gameoflife.NewGrid(float64(6), windowWidth, windowHeight)
-	canvas := pixelgl.NewCanvas(pixel.R(-windowWidth, -windowHeight, windowWidth, windowHeight))
-
 	var (
 		frames = 0
 		second = time.NewTicker(time.Second)
 	)
 
-	imd := imdraw.New(nil)
-	imd.Clear()
-	imd.Color = colornames.White
+	rand.Seed(time.Now().UnixNano())
 
-	//ticker := time.NewTicker(500 * time.Millisecond)
-	batch := pixel.NewBatch(&pixel.TrianglesData{}, nil)
-	grid.DrawEmpty(canvas)
-
-	generation := 0
-
-	record := false
-	filename := fmt.Sprintf("gogol-%d.sim.gz", time.Now().Unix())
-
-	var buf bytes.Buffer
-	zw := gzip.NewWriter(&buf)
-	zw.Name = filename
-
-	//f, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	//if err != nil {
-	//	panic(err)
-	//}
-
-	save := func(c *gameoflife.Cell) [10]byte {
-		var r [10]byte
-
-		r[0] = c.Age
-
-		if c.Alive {
-			r[1] = 0x1
-		} else {
-			r[1] = 0x0
-		}
-
-		//var xBin []byte
-		//binary.LittleEndian.PutUint32(xBin, uint32(c.Vec.X))
-		//
-		//copy(r[:], xBin[:4])
-		//
-		//var yBin []byte
-		//binary.LittleEndian.PutUint32(yBin, uint32(c.Vec.Y))
-		//
-		//copy(r[:], yBin[:4])
-
-		return r
-	}
+	debugMode := gogol.NewDebug(debug, cfg)
+	game := gogol.NewGame(gogol.GameConfig{
+		CellSize: cellSize,
+		Margin:   margin,
+		Width:    windowWidth,
+		Height:   windowHeight,
+	})
 
 	for !win.Closed() {
 
-		if true == record {
-			//_, err := f.Write(gameoflife.FlatMap(grid.Matrix, save))
-			_, err := zw.Write(gameoflife.FlatMap(grid.Matrix, save))
-
-			if nil != err {
-				fmt.Printf("failed to buffer due %s", err.Error())
-			}
-
-			if buf.Len() >= 8192 {
-				err = ioutil.WriteFile(filename, buf.Bytes(), 0666)
-
-				if nil != err {
-					fmt.Printf("failed to save due %s", err.Error())
-				}
-
-				buf.Reset()
-			}
-		}
-
 		win.Clear(colornames.Black)
-		canvas.Draw(win, pixel.IM)
 
-		rand.Seed(time.Now().UnixNano())
+		game.WriteMessage("Game Started")
 
-		population, born, _ := grid.Tick()
+		//if win.Pressed(pixelgl.MouseButtonLeft) {
+		//	mp := win.MousePosition()
+		//	for _, c := range grid.GetNeighbors(grid.PixelToMatrixCoordinate(mp)) {
+		//		c.Born()
+		//	}
+		//}
 
-		if born > 0 {
-			generation++
+		game.Update(time.Now().UnixNano())
+
+		if false == game.IsRunning() {
+			game.WriteMessage("Game finished")
 		}
 
-		batch.Clear()
-		grid.Draw(batch)
-		batch.Draw(win)
+		game.Draw(win)
+		debugMode.Draw(win)
 
 		frames++
 		select {
 		case <-second.C:
-			win.SetTitle(fmt.Sprintf("%s | Population: %d | Generation: %d | FPS: %d", cfg.Title, population, generation, frames))
+			win.SetTitle(fmt.Sprintf("%s | Population: %d | Generation: %d | FPS: %d", cfg.Title, game.Population, game.Generation, frames))
+			debugMode.Update(gogol.DebugStats{Fps: frames, Generation: game.Generation, Population: game.Population})
 			frames = 0
-
-
-
-
 		default:
 		}
 
 		win.Update()
-	}
-
-	if err := zw.Close(); err != nil {
-		log.Fatal(err)
 	}
 
 	log.Printf("Finished game")
