@@ -1,7 +1,6 @@
 package gogol
 
 import (
-	"fmt"
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/imdraw"
 	"image/color"
@@ -12,7 +11,9 @@ import (
 type Cell struct {
 	Alive       bool
 	age         uint8
-	deadCounter uint16
+	DeadCounter uint16
+	DeadBorder  bool
+	DeadVisited bool
 	Pos         Coordinate
 	pol         Polygon
 }
@@ -34,7 +35,7 @@ func NewCell(pol Polygon, col int, row int) *Cell {
 		Alive:       alive,
 		pol:         pol,
 		age:         0,
-		deadCounter: math.MaxUint16,
+		DeadCounter: math.MaxUint16,
 		Pos: Coordinate{
 			row: row,
 			col: col,
@@ -44,32 +45,51 @@ func NewCell(pol Polygon, col int, row int) *Cell {
 
 func (c *Cell) Kill() {
 	c.Alive = false
-	c.deadCounter = 0
+	c.DeadCounter--
 }
 
 func (c *Cell) Born() {
 	c.age = 0
 	c.Alive = true
+	c.DeadCounter = math.MaxUint16
 }
 
 func (c *Cell) IsAlive() bool {
 	return c.Alive
 }
 
+func (c *Cell) HasDeadShadow() bool {
+	return !c.IsAlive() && c.DeadCounter < math.MaxUint16 && c.DeadCounter > 0
+}
+
 func (c *Cell) Update(clock int64) {
-	if c.IsAlive() && c.age < math.MaxUint8 {
+	c.DeadVisited = false
+	c.DeadBorder = false
+	if c.IsAlive() {
 		c.age++
-	} else if false == c.IsAlive() && c.deadCounter < math.MaxUint8 {
-		c.deadCounter++
 	}
 }
 
 func (c *Cell) DrawDead(t pixel.Target) bool {
-	if false == c.IsAlive() && c.deadCounter < math.MaxUint8 {
+
+	if c.DeadBorder {
+		//fmt.Printf("Drawing Cell(%d,%d)\n", c.Pos.row, c.Pos.col)
 		draw := imdraw.New(nil)
 
-		step := uint8(30 - c.deadCounter/9)
-		fmt.Printf("Alpha is %d\n", 30 - step)
+		//step := uint8(30 - c.DeadCounter/9)
+		//fmt.Printf("Printing border \n")
+
+		draw.Color = color.RGBA{R: 255, G: 255, B: 255, A: 255}
+
+		draw.Push(c.pol[:]...)
+		draw.Polygon(0)
+		draw.Draw(t)
+		return true
+	} else if c.HasDeadShadow() {
+		draw := imdraw.New(nil)
+
+		//step := uint8(30 - c.DeadCounter/9)
+		//fmt.Printf("Alpha is %d\n", 30-step)
 
 		draw.Color = color.RGBA{R: 75, G: 0, B: 130, A: 0}
 

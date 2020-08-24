@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/pixelgl"
+	"log"
 )
 
 type Grid struct {
@@ -15,20 +16,23 @@ type Grid struct {
 	cols            int
 	cellSize        float64
 	ruleChain       Rule
+	immutableRules  Rule
 }
 
 type CoordinateVector [2]int
 
 func NewGrid(cfg GameConfig) *Grid {
 
-	cellsPerRow := int(CellsInWidth(cfg.Width, cfg.Margin, cfg.CellSize))
-	cellsPerCol := int(CellsInHeight(cfg.Height, cfg.Margin, cfg.CellSize))
+	cols := int(CellsInWidth(cfg.Width, cfg.Margin, cfg.CellSize))
+	rows := int(CellsInHeight(cfg.Height, cfg.Margin, cfg.CellSize))
 
-	grid := make([][]*Cell, cellsPerCol, cellsPerCol)
+	log.Printf("Created new grid with %d rows and %d columns, so %d cells", rows, cols, rows * cols)
+
+	grid := make([][]*Cell, rows, rows)
 
 	for row := range grid {
-		grid[row] = make([]*Cell, cellsPerRow, cellsPerRow)
-		for col := 0; col < cellsPerRow; col++ {
+		grid[row] = make([]*Cell, cols, cols)
+		for col := 0; col < cols; col++ {
 			pol := NewHexagon(cfg.CellSize, cfg.Margin, uint(col), uint(row))
 			grid[row][col] = NewCell(pol[:], col, row)
 		}
@@ -41,6 +45,11 @@ func NewGrid(cfg GameConfig) *Grid {
 		NewAgeRule,
 	}
 
+	immutableRules := []RuleConstructor{
+		//NewDetectDeadBorders,
+		NewDoNotDeadShadowIfNotNeighbors,
+	}
+
 	canvas := pixelgl.NewCanvas(pixel.R(-cfg.Width, -cfg.Height, cfg.Width, cfg.Height))
 	for i := range grid {
 		for _, c := range grid[i] {
@@ -51,9 +60,10 @@ func NewGrid(cfg GameConfig) *Grid {
 	return &Grid{
 		Data:            grid,
 		cellSize:        cfg.CellSize,
-		rows:            cellsPerCol,
-		cols:            cellsPerRow,
+		rows:            rows,
+		cols:            cols,
 		ruleChain:       NewRuleChain(rules),
+		immutableRules:  NewRuleChain(immutableRules),
 		cellBatch:       pixel.NewBatch(&pixel.TrianglesData{}, nil),
 		deadCellBatch:   pixel.NewBatch(&pixel.TrianglesData{}, nil),
 		emptyCellCanvas: canvas,
@@ -70,6 +80,7 @@ func (g *Grid) copy() *Grid {
 		ruleChain:       g.ruleChain,
 		emptyCellCanvas: g.emptyCellCanvas,
 		deadCellBatch:   g.deadCellBatch,
+		immutableRules:  g.immutableRules,
 	}
 
 	for row := range ng.Data {
@@ -82,18 +93,49 @@ func (g *Grid) copy() *Grid {
 
 func (g *Grid) Update(clock int64) (p int) {
 
+	log.Printf("-------------------------------------------")
+
 	population := 0
 	ng := g.copy()
+
 
 	for i := range g.Data {
 		for _, c := range g.Data[i] {
 			c.Update(clock)
-			ng.Data[c.Pos.row][c.Pos.col] = g.ruleChain(*c, g.GetNeighbors(c))
-			if ng.Data[c.Pos.row][c.Pos.col].IsAlive() {
+
+			nc := g.ruleChain(c, g, g.GetNeighbors(c))
+			//fmt.Printf("%s == %s\n", c.DeadVisited, nc.DeadVisited)
+
+			if nc.IsAlive() {
 				population++
+			}
+
+			ng.Data[c.Pos.row][c.Pos.col] = nc
+		}
+	}
+
+	for i := range g.Data {
+		for _, c := range g.Data[i] {
+			ng.Data[c.Pos.row][c.Pos.col] = g.immutableRules(c, g, g.GetNeighbors(c))
+		}
+	}
+
+	totalVisited := 0
+	totalWithBorders := 0
+
+	for i := range ng.Data {
+		for _, c2 := range ng.Data[i] {
+			if c2.DeadVisited {
+				totalVisited++
+			}
+
+			if c2.DeadBorder {
+				totalWithBorders++
 			}
 		}
 	}
+
+	log.Printf("[GRID] Total visited %d and with borders %d\n", totalVisited, totalWithBorders)
 
 	*g = *ng
 
@@ -126,16 +168,6 @@ func (g *Grid) existsRow(row int) bool {
 
 func (g *Grid) existsColumn(col int) bool {
 	return col >= 0 && col <= g.cols-1
-}
-
-func sumAlive(cs ...*Cell) int {
-	sum := 0
-	for _, c := range cs {
-		if c.IsAlive() {
-			sum += 1
-		}
-	}
-	return sum
 }
 
 func (g *Grid) Draw(t pixel.Target) {
