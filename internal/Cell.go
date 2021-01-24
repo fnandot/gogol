@@ -27,7 +27,7 @@ func NewCell(pol Polygon, col int, row int) *Cell {
 
 	alive := false
 
-	if rand.Intn(100) > 90 {
+	if rand.Intn(100) > 50 {
 		alive = true
 	}
 
