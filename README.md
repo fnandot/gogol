@@ -1,6 +1,6 @@
 # [WIP] Go Game of Life (GoGoL)
 
-Just a hexagonal version of Conway's Game of Life written in Golang. 
+Just a hexagonal grid version of Conway's Game of Life written in Golang. 
 
 ![Animation](/doc/animation.gif)
 
@@ -17,6 +17,12 @@ Just a hexagonal version of Conway's Game of Life written in Golang.
 ```
 $> go run cmd/main.go -resolution=1280x720 -cellsize=12 -margin=10 -debug -vsync
 ```
+
+## TODO
+
+- [ ] Performance improvement
+- [ ] Code refactoring
+- [ ] Add unit tests for each Rule, Cell, etc
 
 ## Links
 - https://www.redblobgames.com/grids/hexagons
